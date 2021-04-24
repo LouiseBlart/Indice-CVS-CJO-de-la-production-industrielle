@@ -11,8 +11,10 @@ rm(list=ls())
 require(zoo)
 require(tseries)
 
+### PARTIE 1 : LES DONNEES
+
 # On identifie un répertoire de travail 
-setwd(dir="C:/Users/louis/OneDrive/Documents/ENSAE/2A/series_temp")
+setwd(dir="C:/Users/jeann/OneDrive/Documents/scolaire/ENSAE/2A/S2/séries temporelles/projet/git")
 # On importe les données 
 data <- read.csv("valeurs_mensuelles.csv",  sep = ";", dec = "." ,header = T, skip = 2)
 # skip =2 : pour retirer les deux premières lignes qui sont une "description" des données
@@ -47,3 +49,17 @@ summary(data)
 # Plot des données
 plot(data$Periode, data$Indice, type = "l", xlab = "Periode",
      ylab = "Indice", col = "royalblue3")
+
+# on constate que la série n'a pas l'air très stationnaire. 
+# Deux tendances semblent se distinguer : de 1990 à 2000 puis de 200 à 2020. 
+
+# on différencie la série (à l'ordre 1) pour tenter de la rendre stationnaire : 
+data <- zoo(data['Indice'], order.by = Periode) 
+diff_data <- diff(data, 1)
+plot(diff_data, type = "l", xlab = "Periode", ylab = "Indice différencié", col = "royalblue3")
+
+plot(cbind(data, diff_data))
+
+summary(lm(data~Periode))
+
+     
