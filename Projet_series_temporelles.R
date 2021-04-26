@@ -123,8 +123,125 @@ kpss.test(diff_data)
 # CONCLUSION : la série différenciée est bien stationnaire, youpi. 
 
 par(mfrow = c(1, 2)) # dispose les graphiques sur 1 ligne
-plot(data, type = "l", xlab = "Periode", ylab = "Indice différencié", col = "royalblue3")
+plot(data, type = "l", xlab = "Periode", ylab = "Indice non différencié", col = "royalblue3")
 plot(diff_data, type = "l", xlab = "Periode", ylab = "Indice différencié", col = "royalblue3")
 
 
 
+
+### PARTIE 2 : MODELES ARIMA
+
+# on étudie les autocorrélogrammes pour déterminer les ordres p et q possibles 
+
+par(mfrow = c(1, 1))
+
+# autocorrélations
+acf(diff_data)
+# les auto-corrélations 0, 1, 2 sortent clairement de la zone de confiance
+# la 3 presque
+# => on propose q_max = 3
+qmax <- 3
+
+#autocorrélations partielles
+pacf(diff_data)
+# les auto-corrélations partielles 1, 2, 3 sortent clairement de la zone de confiance
+# => on propose p_max = 3
+pmax <- 3
+
+# on regarde si les modèles sont valides (i.e. les résidus sont des bruits blancs)
+# et s'ils sont ajustés (i.e. les coefficients les plus élevés sont significatifs)
+# pour ce faire on crée des fonctions :
+valid_model <- function(estim, kmax, fitdf, threshold){ # dit si les résidus sont blancs selon le test de Ljung-Box 
+  R <- 1
+  for (i in (fitdf+1):kmax){
+    r <- if (Qtests(estim$residuals,kmax,fitdf=fitdf)[i,2] < threshold) 0 else 1
+    R = R*r
+  }
+  output <- if (R == 0) FALSE else TRUE
+  return(output)
+}
+
+signif <- function(estim){  # réalise des t-tests sur les coefficients
+  coef <- estim$coef
+  se <- sqrt(diag(estim$var.coef))
+  t <- coef/se
+  pval <- (1-pnorm(abs(t)))*2
+  return(rbind(coef,se,pval))
+}
+
+ajusted_model <- function(estim, p, q){ # dit si le modèle est ajusté ou non 
+  R <- 1
+  r <- if (p == 0) 1 else (if (signif(estim)[3,p] > 0.05) 0 else 1)
+  s <- if (q == 0) 1 else (if (signif(estim)[3,p+q] > 0.05) 0 else 1)
+  R = R*r*s
+  output <- if (R == 0) FALSE else TRUE
+  return(output)
+}
+
+
+mat <- matrix(NA,nrow = pmax + 1, ncol = qmax + 1) # structure de matrice vide 
+rownames(mat) <- paste0("p=",0:pmax) # renomme les lignes
+colnames(mat) <- paste0("q=",0:qmax) # renomme les colonnes
+validity <- mat # matrice des validités vide
+ajustment <- mat # matrice des ajustements vide
+pqs <- expand.grid(0:pmax,0:qmax) # toutes les combinaisons possibles de p et q 
+for (row in 1:dim(pqs)[1]){ #boucle pour chaque (p,q)
+  p <- pqs[row,1] #recup p
+  q <- pqs[row,2] #recup q
+  estim <- try(arima(diff_data, c(p,0,q), include.mean = F)) #tente d'estimer l'ARIMA(p,0,q)
+  validity[p+1,q+1] <- valid_model(estim, 24, p+q, 0.01)  #assigne la validité 
+  ajustment[p+1,q+1] <- if ((p == 0) & (q == 0)) NA else ajusted_model(estim, p, q)  #assigne l'ajustement
+}
+# matrice des validités
+validity
+# on constate qu'aucun modèle n'est valide 
+# => il faut élargir le nombre de modèles étudiés, en augmentant p_max et q_max
+
+
+# autocorrélations
+acf(diff_data)
+# on constate que l'acf d'ordre 6 est nettement hors de l'intervalle de confiance
+qmax <- 6
+
+#autocorrélations partielles
+pacf(diff_data)
+# idem, la pacf d'ordre 6 est nettement hors de l'intervalle de confiance
+pmax <- 6
+
+mat <- matrix(NA,nrow = pmax + 1, ncol = qmax + 1) # structure de matrice vide 
+rownames(mat) <- paste0("p=",0:pmax) # renomme les lignes
+colnames(mat) <- paste0("q=",0:qmax) # renomme les colonnes
+validity <- mat # matrice des validités vide
+ajustment <- mat # matrice des ajustements vide
+pqs <- expand.grid(0:pmax,0:qmax) # toutes les combinaisons possibles de p et q 
+for (row in 1:dim(pqs)[1]){ #boucle pour chaque (p,q)
+  p <- pqs[row,1] #recup p
+  q <- pqs[row,2] #recup q
+  estim <- try(arima(diff_data, c(p,0,q), include.mean = F)) #tente d'estimer l'ARIMA(p,0,q)
+  validity[p+1,q+1] <- valid_model(estim, 24, p+q, 0.01)  #assigne la validité 
+  ajustment[p+1,q+1] <- if ((p == 0) & (q == 0)) NA else ajusted_model(estim, p, q)  #assigne l'ajustement
+}
+# matrice des validités
+validity
+
+# matrice des ajustements 
+ajustment
+
+# => les couples (p,q) pour lesquels on a un modèle ajusté et valide sont : 
+# (6,0) ; (3,4) ; (4,5) 
+
+# on peut maintenant comparer ces modèles entre eux à l'aide des critères d'information
+arima600 <- arima(diff_data, c(6,0,0), include.mean = F)
+arima304 <- arima(diff_data, c(3,0,4), include.mean = F)
+arima405 <- arima(diff_data, c(4,0,5), include.mean = F)
+models <- c("arima600","arima304","arima405")
+names(models) <- models
+apply(as.matrix(models),1, function(m) c("AIC"=AIC(get(m)), "BIC"=BIC(get(m))))
+# l'AIC est minimisé par l'ARIMA(3,0,4)
+# le BIC est minimisé par l'ARIMA(3,0,4) aussi
+
+## CONCLUSION : l'ARIMA(3,0,4) est le meilleur modèle étudié pour la série diff_data. 
+
+# pour la série data, il s'agit donc d'un ARIMA(3,1,4)
+arima314 <- arima(data, c(3,1,4), include.mean = F)
+arima314
