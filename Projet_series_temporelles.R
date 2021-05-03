@@ -8,6 +8,7 @@ rm(list=ls())
 # On importe les packages utiles pour ce projet :
 #install.packages("zoo")
 #install.packages("tseries")
+# install.packages("fUnitRoots")
 require(zoo)
 require(tseries)
 require(fUnitRoots)
@@ -15,7 +16,8 @@ require(fUnitRoots)
 ### PARTIE 1 : LES DONNEES
 
 # On identifie un répertoire de travail 
-setwd(dir="C:/Users/jeann/OneDrive/Documents/scolaire/ENSAE/2A/S2/séries temporelles/projet/git")
+setwd(dir="C:/Users/louis/OneDrive/Documents/ENSAE/2A/series_temp/Projet")
+
 # On importe les données 
 data <- read.csv("valeurs_mensuelles.csv",  sep = ";", dec = "." ,header = T, skip = 2)
 # skip =2 : pour retirer les deux premières lignes qui sont une "description" des données
@@ -245,3 +247,15 @@ apply(as.matrix(models),1, function(m) c("AIC"=AIC(get(m)), "BIC"=BIC(get(m))))
 # pour la série data, il s'agit donc d'un ARIMA(3,1,4)
 arima314 <- arima(data, c(3,1,4), include.mean = F)
 arima314
+
+### PARTIE 3 : Previsions 
+# install.packages("forecast")
+require(forecast)
+
+forecast (arima314, 2)
+# Affichage
+plot(forecast(arima314,2, level = c(95)), 
+     sub = "Intervalle de confiance à 95%", 
+     ylab = "Indice",
+     main = "Prédiction en T+1 et T+2",
+     ) 
